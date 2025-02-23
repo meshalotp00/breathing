@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تمرين التنفس المتدرج</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #121212;
+      color: white;
+      font-family: 'Arial', sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .container {
+      text-align: center;
+      width: 90%;
+      max-width: 350px;
+    }
+    .main-circle {
+      position: relative;
+      width: 250px;
+      height: 250px;
+      margin: 20px auto;
+      border-radius: 50%;
+    }
+    .breath-pulse {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 250px;
+      height: 250px;
+      border-radius: 50%;
+      opacity: 0.2;
+      animation: pulse 1.5s ease-in-out infinite alternate;
+      pointer-events: none;
+      z-index: 0;
+      transition: background-color 0.3s ease;
+    }
+    .breath-pulse.inhale {
+      background-color: #00ffcc;
+    }
+    .breath-pulse.exhale {
+      background-color: #ff4444;
+    }
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.05); }
+    }
+    .progress-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      transform: rotate(-90deg);
+      z-index: 1;
+    }
+    .progress-ring circle {
+      fill: none;
+      stroke-linecap: round;
+      transition: stroke 0.3s ease, filter 0.3s ease;
+    }
+    .progress-ring circle.inhale {
+      stroke: #00ffcc;
+      filter: drop-shadow(0 0 8px #00ffcc);
+    }
+    .progress-ring circle.exhale {
+      stroke: #ff4444;
+      filter: drop-shadow(0 0 8px #ff4444);
+    }
+    .timer {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 28px;
+      font-weight: bold;
+      white-space: nowrap;
+      z-index: 2;
+    }
+    .phase-info {
+      font-size: 26px;
+      color: #00ffcc;
+      margin: 15px 0;
+      opacity: 0;
+      transition: opacity 0.4s, transform 0.4s;
+      transform: translateY(-10px);
+    }
+    .phase-info.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .breath-state {
+      position: absolute;
+      top: 72%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      opacity: 0.3;
+      z-index: 3;
+      transition: all 0.3s ease;
+    }
+    .breath-state.inhale {
+      color: #00ffcc;
+      text-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+    }
+    .breath-state.exhale {
+      color: #ff4444;
+      text-shadow: 0 0 10px rgba(255, 68, 68, 0.3);
+    }
+    .buttons-container {
+      margin-top: 30px;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+    }
+    button {
+      background: #00ffcc;
+      color: #121212;
+      border: none;
+      padding: 12px 25px;
+      font-size: 16px;
+      border-radius: 25px;
+      cursor: pointer;
+      min-width: 100px;
+      transition: transform 0.2s, background 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      background: #00e6b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="phase-info" id="phaseInfo">المرحلة 1/6</div>
+    
+    <div class="main-circle">
+      <div class="breath-pulse inhale" id="breathPulse"></div>
+      <svg class="progress-ring" viewBox="0 0 250 250">
+        <circle cx="125" cy="125" r="120"
+                stroke="rgba(255,255,255,0.2)"
+                stroke-width="2"/>
+        <circle id="progressCircle"
+                class="inhale"
+                cx="125" cy="125" r="120"
+                stroke-width="4"/>
+      </svg>
+      <div class="timer" id="timer">جاهز</div>
+      <div class="breath-state" id="breathState"></div>
+    </div>
+
+    <div class="buttons-container">
+      <button onclick="startExercise()">ابدأ</button>
+      <button onclick="stopExercise()">إيقاف</button>
+    </div>
+  </div>
+
+  <script>
+    let animationFrameId;
+    const stages = [
+      { inhale: 13, exhale: 13 },
+      { inhale: 8, exhale: 8 },
+      { inhale: 5, exhale: 5 },
+      { inhale: 3, exhale: 3 },
+      { inhale: 2, exhale: 2 },
+      { inhale: 1, exhale: 1 }
+    ];
+
+    let currentStage = 0;
+    let isRunning = false;
+    let circle, timerElement, phaseInfoElement, breathPulse, breathState;
+    let circumference;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      circle = document.getElementById('progressCircle');
+      timerElement = document.getElementById('timer');
+      phaseInfoElement = document.getElementById('phaseInfo');
+      breathPulse = document.getElementById('breathPulse');
+      breathState = document.getElementById('breathState');
+
+      const radius = circle.r.baseVal.value;
+      circumference = 2 * Math.PI * radius;
+      circle.style.strokeDasharray = circumference;
+      circle.style.strokeDashoffset = circumference;
+    });
+
+    function setBreathState(isInhale) {
+      if (isInhale) {
+        breathState.textContent = "شهيق";
+        breathState.className = "breath-state inhale";
+        circle.classList.remove('exhale');
+        circle.classList.add('inhale');
+        breathPulse.classList.remove('exhale');
+        breathPulse.classList.add('inhale');
+      } else {
+        breathState.textContent = "زفير";
+        breathState.className = "breath-state exhale";
+        circle.classList.remove('inhale');
+        circle.classList.add('exhale');
+        breathPulse.classList.remove('inhale');
+        breathPulse.classList.add('exhale');
+      }
+    }
+
+    function animateProgress(duration, isInhale) {
+      return new Promise(resolve => {
+        const startTime = performance.now();
+        const startOffset = isInhale ? circumference : 0;
+        const targetOffset = isInhale ? 0 : circumference;
+        
+        setBreathState(isInhale);
+
+        function update() {
+          if (!isRunning) {
+            cancelAnimationFrame(animationFrameId);
+            resolve();
+            return;
+          }
+
+          const elapsed = performance.now() - startTime;
+          const progress = Math.min(elapsed / (duration * 1000), 1);
+          const currentOffset = startOffset - (startOffset - targetOffset) * progress;
+
+          circle.style.strokeDashoffset = currentOffset;
+          timerElement.textContent = (duration - (elapsed / 1000)).toFixed(1);
+
+          if (progress < 1) {
+            animationFrameId = requestAnimationFrame(update);
+          } else {
+            resolve();
+          }
+        }
+
+        animationFrameId = requestAnimationFrame(update);
+      });
+    }
+
+    async function startExercise() {
+      if (isRunning) return;
+      isRunning = true;
+      phaseInfoElement.classList.add('show');
+
+      for (currentStage = 0; currentStage < stages.length; currentStage++) {
+        if (!isRunning) break;
+        phaseInfoElement.textContent = `المرحلة ${currentStage + 1}/6`;
+        
+        const stage = stages[currentStage];
+        await animateProgress(stage.inhale, true);
+        if (!isRunning) break;
+        await animateProgress(stage.exhale, false);
+        if (!isRunning) break;
+      }
+
+      if (isRunning) {
+        timerElement.textContent = "تم الانتهاء!";
+        phaseInfoElement.classList.remove('show');
+        setTimeout(() => {
+          timerElement.textContent = "جاهز";
+          circle.style.strokeDashoffset = circumference;
+          setBreathState(true);
+          breathState.textContent = "";
+        }, 2000);
+      }
+      isRunning = false;
+      currentStage = 0;
+    }
+
+    function stopExercise() {
+      if (!isRunning) return;
+      isRunning = false;
+      cancelAnimationFrame(animationFrameId);
+
+      const startOffset = parseFloat(circle.style.strokeDashoffset);
+      const duration = 0.5;
+      const startTime = performance.now();
+
+      function animateReset() {
+        const elapsed = (performance.now() - startTime) / 1000;
+        const progress = Math.min(elapsed / duration, 1);
+
+        circle.style.strokeDashoffset = startOffset + (circumference - startOffset) * progress;
+
+        if (progress < 1) {
+          requestAnimationFrame(animateReset);
+        } else {
+          circle.style.strokeDashoffset = circumference;
+          setBreathState(true);
+          timerElement.textContent = "جاهز";
+          phaseInfoElement.classList.remove('show');
+          breathState.textContent = "";
+        }
+      }
+
+      animateReset();
+    }
+  </script>
+</body>
+</html>
